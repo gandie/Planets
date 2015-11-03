@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 # 1.0
+# new bugs coming soon!
 
 LEFT=1 # left mouse button
 MIDDLE=2
