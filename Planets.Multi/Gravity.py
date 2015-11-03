@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 # 1.0
+# this will be multithreaded somtimes soon...
 
 LEFT=1 # left mouse button
 MIDDLE=2
