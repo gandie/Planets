@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+# 1.0
+
 LEFT=1 # left mouse button
 MIDDLE=2
 RIGHT=3 # ...
