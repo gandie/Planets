@@ -1,0 +1,216 @@
+#!/usr/bin/env python
+
+import pygame
+from itertools import cycle
+from math import *
+
+GRAVITY=50
+
+class Planet:
+
+    # wrap parameters into dictionary!
+    def __init__(self, diameter, colour, pos, mass, vel_x, vel_y, fixed, centrum):
+        self.mass = mass
+        self.diameter = diameter
+        self.colour = colour
+        self.pos = pos
+        self.center = (pos[0]+diameter/2,pos[1]+diameter/2)
+
+
+        self.vel_x = vel_x
+        self.vel_y = vel_y
+
+        self.fixed = fixed
+        self.centrum = centrum
+
+        self.delta_x = 0
+        self.delta_y = 0
+
+        self.rect = pygame.Rect(pos, (diameter,diameter))
+        self.draw()
+
+    # creates and updates surface(=picture) of planet
+    def draw(self):
+        # right now its only a coloured circle
+        self.surface = pygame.Surface((self.diameter,self.diameter))
+        pygame.draw.circle(self.surface, self.colour, (self.diameter/2,self.diameter/2), 
+                           self.diameter/2)
+        self.surface = self.surface.convert()
+
+    # calculate new position and update position-data
+    def calc_pos(self):
+        x = self.pos[0]
+        y = self.pos[1]
+
+        self.delta_x = self.vel_x
+        self.delta_y = self.vel_y
+
+        # update position n shit
+        self.pos = ((x + self.vel_x),(y + self.vel_y))
+        self.center = (self.pos[0]+self.diameter/2,self.pos[1]+self.diameter/2)
+        self.rect = pygame.Rect(self.pos,(self.diameter,self.diameter))
+
+    # simple mover
+    def move(self,move_x,move_y):
+
+        x = self.pos[0]
+        y = self.pos[1]
+
+        self.pos = ((x+move_x),(y+move_y))
+        self.center = (self.pos[0]+self.diameter/2,self.pos[1]+self.diameter/2)
+        self.rect = pygame.Rect(self.pos,(self.diameter,self.diameter))
+
+    def calc_gravity(self, body):
+        if not self.fixed:
+            # some triangle magic
+            dist_x = self.center[0] - body.center[0]
+            dist_y = self.center[1] - body.center[1]
+            dist = sqrt(dist_x ** 2 + dist_y ** 2)
+
+            # same triangle backwards
+            force = (GRAVITY * self.mass * body.mass) / (dist**2)
+            force_x = force * (dist_x / dist)
+            force_y = force * (dist_y / dist)
+
+            self.vel_x -= force_x / self.mass
+            self.vel_y -= force_y / self.mass
+
+            self.delta_x = self.vel_x
+            self.delta_y = self.vel_y
+
+    # maybe split this
+    def merge(self, body):
+
+        # collision-magic calculations
+        impulse_x = (self.vel_x * self.mass + body.vel_x * body.mass)
+        impulse_y = (self.vel_y * self.mass + body.vel_y * body.mass)
+
+        # update mass
+        self.mass += body.mass
+
+        # update velocity
+        if not self.fixed:
+            self.vel_x = impulse_x / self.mass
+            self.vel_y = impulse_y / self.mass 
+
+        # put in some red and grow planet
+        if not (self.colour[0] > 245):
+            self.colour = (self.colour[0]+10,self.colour[1],self.colour[2])
+        self.diameter += 1 # ...
+        self.draw()
+
+class PlanetHandler:
+    def __init__(self):
+        self.center_id = 0
+        self.liste = []
+
+    def append_defbody(self,d):
+        self.liste.append(Planet(d["diameter"],d["colour"],d["pos"],d["mass"],
+                                 d["vel_x"],d["vel_y"],d["fixed"],d["centrum"]))
+        return "to be done"
+
+    def append_body(self,body):
+        self.liste.append(body)
+
+    def get_planets(self):
+        return self.liste
+
+    def remove_planet(self,body):
+        self.liste.remove(body)
+
+    def find_centrum(self):
+        for i in range(len(self.liste)):
+            if not self.liste[i].centrum:
+                continue
+            self.center_id = i
+
+    def set_nextCentrum(self,center_x,center_y):
+
+        self.find_centrum()
+
+        # unset old centrum
+        self.liste[self.center_id].centrum = False
+
+        # magic cycle to id (=index of list) of new one
+        # this might be stupid as hell
+        c = cycle(range(len(self.liste)))
+        a = 0
+        while True:
+            a = c.next()
+            if a == self.center_id:
+                break
+        next_id = c.next()
+
+        print "NEXTID %s" %next_id
+
+        # set new centrum
+        self.liste[next_id].centrum = True
+
+        # get coordinates of new center
+        x = self.liste[next_id].pos[0]
+        y = self.liste[next_id].pos[1]
+
+        # move new center into screencenter
+        self.liste[next_id].pos = (center_x,center_y)
+
+        # calc distance from new center to screencenter
+        dist_x = center_x - x
+        dist_y = center_y - y
+
+        print dist_x,dist_y
+        
+        # update all bodies
+        for body in self.liste:
+            if body.centrum:
+                continue
+            body.move(dist_x,dist_y)
+        
+    def get_correction(self):
+        self.find_centrum()
+        if self.center_id == len(self.liste):
+            return (0,0)
+        cor_x = self.liste[self.center_id].delta_x
+        cor_y = self.liste[self.center_id].delta_y
+
+        return (cor_x,cor_y)
+
+
+    def merge_planets(self):
+        for body in self.liste:
+            for body2 in self.liste:
+                if (body == body2):
+                    continue
+                if not body.rect.colliderect(body2.rect):
+                    continue
+                if body.mass < body2.mass:
+                    continue
+                print 'Kollision'
+                body.merge(body2)
+                self.remove_planet(body2)
+
+    def calc_gravity(self):
+        for body in self.liste:
+            for body2 in self.liste:
+                if (body == body2):
+                    continue
+                body.calc_gravity(body2)
+
+    def calc_positions(self):
+
+        cor = self.get_correction()
+        cor_x = cor[0]
+        cor_y = cor[1]
+
+        for body in self.liste:
+            body.pos = (body.pos[0]-cor_x,body.pos[1]-cor_y)
+            body.calc_pos()
+
+    def draw_planets(self, display):
+        for body in self.liste:
+            display.blit(body.surface, body.pos)
+
+        return display
+
+    def move_all(self, move_x, move_y):
+        for body in self.liste:
+            body.move(move_x,move_y)
